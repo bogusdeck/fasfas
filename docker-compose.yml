@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Backend container (Django)
+  backend:
+    build:
+      context: ./xamp
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - ./xamp:/app
+      - ./xamp/media:/app/media
+      - ./xamp/static:/app/static
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./xamp/.env
+    restart: unless-stopped
+    environment:
+      - DEBUG=True
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=systum.settings.development
+
+  # Frontend container (React)
+  frontend:
+    build:
+      context: ./FASFAS
+      dockerfile: Dockerfile
+    volumes:
+      - ./FASFAS:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
