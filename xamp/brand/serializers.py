@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import BrandUser
+from .models import BrandUser, Announcement
 import requests
 
 User = get_user_model()
@@ -179,3 +179,29 @@ class MicroDepositVerificationSerializer(serializers.Serializer):
 class FinalSubmissionSerializer(serializers.Serializer):
     terms_accepted = serializers.BooleanField(required=True)
     privacy_policy_accepted = serializers.BooleanField(required=True)
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Announcement
+        fields = ['id', 'title', 'content', 'type', 'type_display', 'is_active', 'priority',
+                  'publish_date', 'expiry_date', 'is_expired', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class BrandPendingTaskSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    is_overdue = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = BrandPendingTask
+        fields = ['id', 'title', 'description', 'status', 'status_display', 'priority',
+                  'priority_display', 'category', 'category_display', 'due_date',
+                  'completion_date', 'is_actionable', 'action_url', 'is_overdue',
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']

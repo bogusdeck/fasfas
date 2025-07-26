@@ -24,10 +24,10 @@ services:
   # Frontend container (React)
   frontend:
     build:
-      context: ./FASFAS
+      context: ./twek
       dockerfile: Dockerfile
     volumes:
-      - ./FASFAS:/app
+      - ./twek:/app
       - /app/node_modules
     ports:
       - "3000:3000"

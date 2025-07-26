@@ -13,6 +13,7 @@ from .onboarding import (
     MicroDepositVerificationAPIView, BrandOnboardingSummaryAPIView,
     FinalSubmissionAPIView
 )
+from .dashboard import BrandProfileAPIView, BrandAnnouncementsAPIView, BrandPendingTasksAPIView
 
 app_name = 'brand'
 
@@ -64,4 +65,10 @@ urlpatterns = [
     # Final Review and Submission
     path('onboarding-summary/', BrandOnboardingSummaryAPIView.as_view(), name='onboarding_summary'),
     path('final-submission/', FinalSubmissionAPIView.as_view(), name='final_submission'),
+
+
+    # Dashboard APIs
+    path('dashboard/profile/', BrandProfileAPIView.as_view(), name='dashboard_profile'),
+    path('dashboard/announcements/', BrandAnnouncementsAPIView.as_view(), name='brand_announcements'),
+    path('dashboard/pending-tasks/', BrandPendingTasksAPIView.as_view(), name='brand_pending_tasks'),
 ]
