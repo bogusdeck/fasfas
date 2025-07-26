@@ -23,6 +23,11 @@ class BrandUser(models.Model):
         (10, 'Onboarding Complete'),
     )
 
+    BUSINESS_PREFERENCE_CHOICES = (
+        ('marketplace_only', 'Sell via our Market Place'),
+        ('marketplace_and_api', 'Sell via market place and API also'),
+    )
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='brand_profile')
     company_name = models.CharField(max_length=255, blank=True, null=True)
     website = models.URLField(blank=True, null=True)
@@ -70,11 +75,42 @@ class BrandDetails(models.Model):
     """
     Model to store additional brand details
     """
+    BUSINESS_PREFERENCE_CHOICES = (
+        ('marketplace_only', 'Sell via our Market Place'),
+        ('marketplace_and_api', 'Sell via market place and API also'),
+    )
+
     brand_user = models.OneToOneField(BrandUser, on_delete=models.CASCADE, related_name='details')
     owner_name = models.CharField(max_length=255)
     contact_number = models.CharField(max_length=20)
     company_type = models.CharField(max_length=100)
     address = models.TextField()
+    business_preference = models.CharField(max_length=50, choices=BUSINESS_PREFERENCE_CHOICES, blank=True, null=True, help_text="Business preference for selling")
+    daily_order_volume = models.PositiveIntegerField(blank=True, null=True, help_text="Expected daily order volume as integer")
+    signature_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the verified signature")
+    tan_number = models.CharField(max_length=50, blank=True, null=True, help_text="Tax Account Number")
+
+    # Bank details fields
+    account_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    account_number = models.CharField(max_length=30, blank=True, null=True)
+    ifsc_code = models.CharField(max_length=20, blank=True, null=True)
+    cancelled_cheque_path = models.CharField(max_length=255, blank=True, null=True)
+    bank_reference_id = models.CharField(max_length=50, blank=True, null=True)
+    is_bank_verified = models.BooleanField(default=False)
+    micro_deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    # Terms and conditions acceptance
+    terms_accepted = models.BooleanField(default=False)
+    privacy_policy_accepted = models.BooleanField(default=False)
+    onboarding_completed = models.BooleanField(default=False)
+    onboarding_completed_at = models.DateTimeField(blank=True, null=True)
+    onboarding_id = models.CharField(max_length=20, blank=True, null=True, unique=True)
+    verification_status = models.IntegerField(default=0, choices=(
+        (0, 'Disabled'),
+        (1, 'Pending'),
+        (2, 'Accepted'),
+        (3, 'Rejected')
+    ))
 
     # Order statistics
     total_orders = models.IntegerField(default=0, help_text="Total number of orders received")
@@ -193,6 +229,25 @@ class Brand(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     logo = models.ImageField(upload_to='brand_logos/', blank=True, null=True)
+
+    # Product categories as JSON array
+    product_categories = models.JSONField(blank=True, null=True, help_text="Array of product categories")
+
+    # Target gender (can be multiple)
+    gender = models.JSONField(blank=True, null=True, help_text="Array of target genders (men, women, kids, unisex)")
+
+    # Target age group range
+    min_age_group = models.PositiveIntegerField(blank=True, null=True, help_text="Minimum target age")
+    max_age_group = models.PositiveIntegerField(blank=True, null=True, help_text="Maximum target age")
+
+    # Price range
+    min_price_range = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Minimum price range")
+    max_price_range = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Maximum price range")
+
+    # Order metrics
+    average_order_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Average order value")
+    total_skus = models.PositiveIntegerField(blank=True, null=True, help_text="Total number of SKUs")
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

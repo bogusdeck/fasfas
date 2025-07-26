@@ -25,10 +25,6 @@ urlpatterns = [
     path('otp/email/request/', RequestEmailOTPAPIView.as_view(), name='request_email_otp'),
     path('otp/email/verify/', VerifyEmailOTPAPIView.as_view(), name='verify_email_otp'),
 
-    # Brand dashboard and profile
-    path('dashboard/', BrandDashboardAPIView.as_view(), name='brand_dashboard'),
-    path('profile/update/', BrandProfileUpdateAPIView.as_view(), name='brand_profile_update'),
-
     # Email/Password authentication
     path('auth/signup/', EmailPasswordSignupAPIView.as_view(), name='email_password_signup'),
     path('auth/login/', EmailPasswordLoginAPIView.as_view(), name='email_password_login'),
@@ -63,9 +59,13 @@ urlpatterns = [
     path('onboarding-summary/', BrandOnboardingSummaryAPIView.as_view(), name='onboarding_summary'),
     path('final-submission/', FinalSubmissionAPIView.as_view(), name='final_submission'),
 
-
     # Dashboard APIs
     path('dashboard/profile/', BrandProfileAPIView.as_view(), name='dashboard_profile'),
     path('dashboard/announcements/', BrandAnnouncementsAPIView.as_view(), name='brand_announcements'),
     path('dashboard/pending-tasks/', BrandPendingTasksAPIView.as_view(), name='brand_pending_tasks'),
+
+    # Brand dashboard and profile
+    path('dashboard/', BrandDashboardAPIView.as_view(), name='brand_dashboard'),
+    path('profile/update/', BrandProfileUpdateAPIView.as_view(), name='brand_profile_update'),
+
 ]

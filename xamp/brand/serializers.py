@@ -94,19 +94,11 @@ class CityWarehouseSerializer(serializers.Serializer):
 
 
 class WarehouseDetailsSerializer(serializers.Serializer):
-    ORDER_VOLUME_CHOICES = (
-        ('less_than_100', 'Less than 100 orders per day'),
-        ('100_to_500', '100 to 500 orders per day'),
-        ('500_to_1000', '500 to 1000 orders per day'),
-        ('1000_to_5000', '1000 to 5000 orders per day'),
-        ('more_than_5000', 'More than 5000 orders per day'),
-    )
-
     city_warehouses = serializers.ListField(
         child=CityWarehouseSerializer(),
         required=True
     )
-    daily_order_volume = serializers.ChoiceField(choices=ORDER_VOLUME_CHOICES, required=True)
+    daily_order_volume = serializers.IntegerField(required=True, min_value=0)
 
 
 class BrandProductDetailsSerializer(serializers.Serializer):
@@ -117,32 +109,31 @@ class BrandProductDetailsSerializer(serializers.Serializer):
         ('unisex', 'Unisex'),
     )
 
-    AGE_GROUP_CHOICES = (
-        ('0_5', '0-5 years'),
-        ('6_12', '6-12 years'),
-        ('13_18', '13-18 years'),
-        ('19_25', '19-25 years'),
-        ('26_35', '26-35 years'),
-        ('36_50', '36-50 years'),
-        ('50_plus', '50+ years'),
-        ('all', 'All age groups'),
-    )
-
-    PRICE_RANGE_CHOICES = (
-        ('budget', 'Budget (\u20b90-\u20b9500)'),
-        ('mid_range', 'Mid-range (\u20b9500-\u20b92000)'),
-        ('premium', 'Premium (\u20b92000-\u20b95000)'),
-        ('luxury', 'Luxury (\u20b95000+)'),
-    )
-
     brand_logo = serializers.ImageField(required=True)
     product_categories = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=True
     )
     gender = serializers.MultipleChoiceField(choices=GENDER_CHOICES, required=True)
-    target_age_groups = serializers.MultipleChoiceField(choices=AGE_GROUP_CHOICES, required=True)
-    price_range = serializers.MultipleChoiceField(choices=PRICE_RANGE_CHOICES, required=True)
+
+    # Direct input for age range as [min_age, max_age]
+    target_age_groups = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, max_value=100),
+        required=True,
+        min_length=2,
+        max_length=2,
+        help_text="Age range as [min_age, max_age]"
+    )
+
+    # Direct input for price range as [min_price, max_price]
+    price_range = serializers.ListField(
+        child=serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0),
+        required=True,
+        min_length=2,
+        max_length=2,
+        help_text="Price range as [min_price, max_price]"
+    )
+
     product_catalog = serializers.FileField(required=False)  # Optional CSV upload
 
 
@@ -195,13 +186,20 @@ class BrandProfileStatusSerializer(serializers.ModelSerializer):
     """
     onboarding_status_details = serializers.SerializerMethodField()
     user_details = UserSerializer(source='user', read_only=True)
-    
+    business_preference = serializers.SerializerMethodField()
+
     class Meta:
         model = BrandUser
-        fields = ['id', 'company_name', 'website', 'industry', 'is_verified', 
-                  'onboarding_status', 'onboarding_status_details', 'user_details',
+        fields = ['id', 'company_name', 'website', 'industry', 'is_verified',
+                  'onboarding_status', 'onboarding_status_details', 'business_preference', 'user_details',
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
+
     def get_onboarding_status_details(self, obj):
         return obj.get_onboarding_status_details()
+
+    def get_business_preference(self, obj):
+        try:
+            return obj.details.business_preference
+        except:
+            return None

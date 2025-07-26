@@ -14,6 +14,8 @@ from .serializers import (
     BrandProductDetailsSerializer, WarehouseDetailsSerializer
 )
 from .models import BrandUser
+from brand.helpers import check_user_verification, get_brand_user
+
 
 class GSTVerificationAPIView(APIView):
     """
@@ -47,14 +49,9 @@ class GSTVerificationAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before GST verification'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
         serializer = GSTVerificationSerializer(data=request.data)
         if serializer.is_valid():
@@ -108,28 +105,16 @@ class BrandBasicInfoAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before submitting basic information'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand has completed GST verification
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # For now, we're not actually checking GST verification since it's not implemented yet
-            # In the future, we would check something like brand_user.is_gst_verified
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # For now, we're not actually checking GST verification since it's not implemented yet
+        # In the future, we would check something like brand_user.is_gst_verified
 
         serializer = BrandBasicInfoSerializer(data=request.data)
         if serializer.is_valid():
@@ -159,7 +144,7 @@ class BrandBasicInfoAPIView(APIView):
             )
 
             # Update onboarding status to brand info completed
-            brand_user.update_onboarding_status(4)  # Move to signature upload step
+            brand_user.update_onboarding_status(4)
 
             return Response(
                 {
@@ -205,27 +190,15 @@ class SignatureUploadAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before uploading signature'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if basic information is completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # In a real implementation, we would check if basic information is completed
 
         serializer = SignatureUploadSerializer(data=request.data)
         if serializer.is_valid():
@@ -234,6 +207,7 @@ class SignatureUploadAPIView(APIView):
             # 1. Save the uploaded file
             # 2. Verify the signature (check format, dimensions, etc.)
             # 3. Generate a unique ID for the signature
+            # TODO : we implement our logic for signature verification and upload the signature on s3 storage
 
             # Generate a mock signature ID
             signature_id = str(uuid.uuid4())
@@ -281,305 +255,36 @@ class SaveSignatureAndTANAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before saving signature and TAN'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if signature verification is completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
 
         serializer = SaveSignatureAndTANSerializer(data=request.data)
         if serializer.is_valid():
-            # For now, we're just returning success without actually saving the data
-            # In a real implementation, we would:
-            # 1. Verify the signature_id exists and belongs to this user
-            # 2. Save the signature_id and TAN number to the brand profile
+            # 1. Verify the signature_id exists and belongs to this user (this would be implemented in a real system)
+            # 2. Save the signature_id and TAN number to the brand details
 
-            # Example of how we might save this data in the future:
-            # brand_user.signature_id = serializer.validated_data['signature_id']
-            # brand_user.tan_number = serializer.validated_data.get('tan_number', '')
-            # brand_user.save()
+            # Get or create brand details for this user
+            from brand.models import BrandDetails
+            brand_details, created = BrandDetails.objects.get_or_create(brand_user=brand_user)
+
+            # Save signature_id and tan_number to BrandDetails
+            brand_details.signature_id = serializer.validated_data['signature_id']
+            brand_details.tan_number = serializer.validated_data.get('tan_number', '')
+            brand_details.save(update_fields=['signature_id', 'tan_number', 'updated_at'])
 
             # Update onboarding status to signature uploaded
-            brand_user.update_onboarding_status(5)  # Move to business preference step
+            brand_user.update_onboarding_status(5)
 
             return Response(
                 {
                     'success': True,
                     'message': 'Signature and TAN saved successfully'
-                },
-                status=status.HTTP_200_OK
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class BrandOnboardingSummaryAPIView(APIView):
-    """
-    API endpoint for retrieving the complete brand onboarding summary
-
-    Requires authentication and verified email and phone
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="Get brand onboarding summary",
-        operation_description="Retrieves the complete summary of all information provided during the onboarding process. Requires authenticated user with verified email and phone.",
-        responses={
-            200: openapi.Response(
-                description="Brand onboarding summary retrieved successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'data': openapi.Schema(
-                            type=openapi.TYPE_OBJECT,
-                            properties={
-                                'basic_info': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'gst_info': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'signature_info': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'business_preference': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'warehouse_details': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'product_details': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'bank_details': openapi.Schema(type=openapi.TYPE_OBJECT),
-                                'verification_status': openapi.Schema(type=openapi.TYPE_OBJECT),
-                            }
-                        )
-                    }
-                )
-            ),
-            401: openapi.Response(description="Authentication required"),
-            403: openapi.Response(description="Email or phone not verified"),
-            404: openapi.Response(description="Brand profile not found"),
-        }
-    )
-    def get(self, request):
-        # Check if user has verified email and phone
-        user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified to view onboarding summary'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # In a real implementation, we would fetch all the data from the database
-        # For now, we'll return a mock response with placeholder data
-
-        # Example of how we might fetch this data in the future:
-        # basic_info = {
-        #     'owner_name': brand_user.owner_name,
-        #     'contact_number': brand_user.contact_number,
-        #     'email': brand_user.email,
-        #     'company_name': brand_user.company_name,
-        #     'company_type': brand_user.company_type,
-        #     'address': brand_user.address,
-        # }
-
-        # Mock response data
-        summary_data = {
-            'basic_info': {
-                'owner_name': 'John Doe',
-                'contact_number': '+919876543210',
-                'email': 'john.doe@example.com',
-                'company_name': 'Example Enterprises',
-                'company_type': 'Private Limited',
-                'address': '123 Main Street, Mumbai, Maharashtra, India',
-            },
-            'gst_info': {
-                'gst_number': '27AAPFU0939F1ZV',
-                'company_name': 'Example Enterprises',
-                'verification_status': 'Verified',
-            },
-            'signature_info': {
-                'signature_id': '550e8400-e29b-41d4-a716-446655440000',
-                'tan_number': 'AAAA99999A',
-            },
-            'business_preference': {
-                'preference': 'marketplace_and_api',
-                'description': 'Sell via market place and API also',
-            },
-            'warehouse_details': {
-                'city_warehouses': [
-                    {'city_name': 'Mumbai', 'warehouse_count': 2},
-                    {'city_name': 'Delhi', 'warehouse_count': 1},
-                    {'city_name': 'Bangalore', 'warehouse_count': 3},
-                ],
-                'daily_order_volume': '100_to_500',
-            },
-            'product_details': {
-                'brand_logo': 'https://example.com/media/brand_logos/logo.png',
-                'product_categories': ['Apparel', 'Footwear', 'Accessories'],
-                'gender': ['men', 'women'],
-                'target_age_groups': ['19_25', '26_35'],
-                'price_range': ['mid_range', 'premium'],
-                'product_catalog_uploaded': True,
-            },
-            'bank_details': {
-                'account_holder_name': 'John Doe',
-                'account_number': '1234567890123456',
-                'ifsc_code': 'ABCD0123456',
-                'cancelled_cheque_uploaded': True,
-                'bank_verification_status': 'Verified',
-            },
-            'verification_status': {
-                'email_verified': True,
-                'phone_verified': True,
-                'gst_verified': True,
-                'bank_verified': True,
-                'onboarding_complete': False,
-            }
-        }
-
-        return Response(
-            {
-                'success': True,
-                'data': summary_data
-            },
-            status=status.HTTP_200_OK
-        )
-
-
-class FinalSubmissionAPIView(APIView):
-    """
-    API endpoint for final submission of the onboarding process
-
-    Requires authentication, verified email and phone, and completed all previous steps
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="Submit final onboarding",
-        operation_description="Completes the onboarding process by accepting terms and conditions. Requires authenticated user with verified email, phone, and completed all previous onboarding steps.",
-        request_body=FinalSubmissionSerializer,
-        responses={
-            200: openapi.Response(
-                description="Onboarding completed successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'onboarding_id': openapi.Schema(type=openapi.TYPE_STRING),
-                    }
-                )
-            ),
-            400: openapi.Response(description="Bad request, validation error"),
-            401: openapi.Response(description="Authentication required"),
-            403: openapi.Response(description="Email or phone not verified"),
-            404: openapi.Response(description="Brand profile not found"),
-            422: openapi.Response(description="Incomplete onboarding steps"),
-        }
-    )
-    def post(self, request):
-        # Check if user has verified email and phone
-        user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified to complete onboarding'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = FinalSubmissionSerializer(data=request.data)
-        if serializer.is_valid():
-            # In a real implementation, we would:
-            # 1. Check if all required onboarding steps are completed
-            # 2. Save the terms acceptance status
-            # 3. Mark the onboarding as complete
-
-            # Example of how we might check for incomplete steps:
-            # incomplete_steps = []
-            # if not brand_user.gst_verified:
-            #     incomplete_steps.append('GST Verification')
-            # if not brand_user.basic_info_completed:
-            #     incomplete_steps.append('Basic Information')
-            # # ... and so on for all required steps
-            #
-            # if incomplete_steps:
-            #     return Response(
-            #         {
-            #             'success': False,
-            #             'message': 'Please complete all required onboarding steps',
-            #             'incomplete_steps': incomplete_steps
-            #         },
-            #         status=status.HTTP_422_UNPROCESSABLE_ENTITY
-            #     )
-
-            # Example of how we might save the terms acceptance:
-            # brand_user.terms_accepted = serializer.validated_data['terms_accepted']
-            # brand_user.privacy_policy_accepted = serializer.validated_data['privacy_policy_accepted']
-            # brand_user.onboarding_completed = True
-            # brand_user.onboarding_completed_at = timezone.now()
-            #
-            # # Set the brand verification status to pending (1)
-            # # Brand verification status codes:
-            # # 0: Disabled
-            # # 1: Pending
-            # # 2: Accepted
-            # # 3: Rejected
-            # brand_user.verification_status = 1  # Pending
-            # brand_user.save()
-
-            # Generate a mock onboarding ID
-            onboarding_id = f"ONBOARD-{user.id}-{brand_user.id}"
-
-            # Update onboarding status to completed
-            brand_user.update_onboarding_status(10)  # Onboarding complete
-
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Onboarding completed successfully. Your account is now under review.',
-                    'onboarding_id': onboarding_id,
-                    'verification_status': {
-                        'code': 1,
-                        'status': 'Pending',
-                        'message': 'Your brand profile is pending verification by our team.'
-                    }
                 },
                 status=status.HTTP_200_OK
             )
@@ -619,45 +324,251 @@ class BusinessPreferenceAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before saving business preferences'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if signature verification is completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # In a real implementation, we would check if signature verification is completed
 
         serializer = BusinessPreferenceSerializer(data=request.data)
         if serializer.is_valid():
-            # For now, we're just returning success without actually saving the data
-            # In a real implementation, we would:
-            # 1. Save the business preference to the brand profile
+            # Import BrandDetails model
+            from .models import BrandDetails
 
-            # Example of how we might save this data in the future:
-            # brand_user.business_preference = serializer.validated_data['business_preference']
-            # brand_user.save()
+            # Get or create BrandDetails and save the business preference
+            brand_details, created = BrandDetails.objects.get_or_create(
+                brand_user=brand_user,
+                defaults={
+                    'owner_name': '',
+                    'contact_number': '',
+                    'company_type': '',
+                    'address': '',
+                    'business_preference': serializer.validated_data['business_preference']
+                }
+            )
+
+            # If BrandDetails already exists, update the business preference
+            if not created:
+                brand_details.business_preference = serializer.validated_data['business_preference']
+                brand_details.save()
 
             # Update onboarding status to business preference completed
-            brand_user.update_onboarding_status(6)  # Move to warehouse details step
+            brand_user.update_onboarding_status(6)
 
             return Response(
                 {
                     'success': True,
                     'message': 'Business preferences saved successfully'
+                },
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WarehouseDetailsAPIView(APIView):
+    """
+    API endpoint for saving warehouse details for brands
+
+    Requires authentication, verified email and phone, and completed business preference selection
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Save warehouse details",
+        operation_description="Saves the warehouse details for the brand including city locations, warehouse count per city, and daily order volume. Requires authenticated user with verified email, phone, and completed business preference selection.",
+        request_body=WarehouseDetailsSerializer,
+        responses={
+            200: openapi.Response(
+                description="Warehouse details saved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: openapi.Response(description="Bad request, validation error"),
+            401: openapi.Response(description="Authentication required"),
+            403: openapi.Response(description="Email or phone not verified"),
+            404: openapi.Response(description="Brand profile not found"),
+        }
+    )
+    def post(self, request):
+        # Check if user has verified email and phone
+        user = request.user
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
+
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # In a real implementation, we would check if business preference is completed
+
+        serializer = WarehouseDetailsSerializer(data=request.data)
+        if serializer.is_valid():
+            # Import required models
+            from .models import BrandDetails, Brand, State, Warehouse
+
+            # Get or create BrandDetails and save daily order volume
+            brand_details, created = BrandDetails.objects.get_or_create(
+                brand_user=brand_user,
+                defaults={
+                    'owner_name': '',
+                    'contact_number': '',
+                    'company_type': '',
+                    'address': '',
+                    'daily_order_volume': serializer.validated_data['daily_order_volume']
+                }
+            )
+
+            # If BrandDetails already exists, update the daily order volume
+            if not created:
+                brand_details.daily_order_volume = serializer.validated_data['daily_order_volume']
+                brand_details.save()
+
+            # Get or create Brand for this user
+            brand, brand_created = Brand.objects.get_or_create(
+                brand_user=brand_user,
+                defaults={
+                    'name': brand_user.company_name or f"Brand {brand_user.user.id}",
+                    'description': 'Brand created during onboarding'
+                }
+            )
+
+            # Process city_warehouses and create State and Warehouse records
+            for city_warehouse in serializer.validated_data['city_warehouses']:
+                city_name = city_warehouse['city_name']
+                warehouse_count = city_warehouse['warehouse_count']
+
+                # Get or create State
+                state, state_created = State.objects.get_or_create(
+                    brand=brand,
+                    name=city_name,
+                    defaults={
+                        'country': 'India',
+                        'is_active': True
+                    }
+                )
+
+                # Create warehouses for this state if they don't exist
+                existing_warehouses = state.warehouses.count()
+                warehouses_to_create = warehouse_count - existing_warehouses
+
+                for i in range(warehouses_to_create):
+                    warehouse_number = existing_warehouses + i + 1
+                    Warehouse.objects.create(
+                        state=state,
+                        name=f"{city_name} Warehouse {warehouse_number}",
+                        warehouse_code=f"{city_name.upper()[:3]}-WH-{warehouse_number:03d}",
+                        warehouse_type='main',
+                        address=f"Warehouse {warehouse_number}, {city_name}",
+                        is_active=True
+                    )
+
+            # Update onboarding status to warehouse details completed
+            brand_user.update_onboarding_status(7)
+
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Warehouse details saved successfully'
+                },
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BrandProductDetailsAPIView(APIView):
+    """
+    API endpoint for saving brand and product details
+
+    Requires authentication, verified email and phone, and completed warehouse details
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @swagger_auto_schema(
+        operation_summary="Save brand and product details",
+        operation_description="Saves the brand logo, product categories, target demographics, and product catalog. Requires authenticated user with verified email, phone, and completed warehouse details.",
+        request_body=BrandProductDetailsSerializer,
+        responses={
+            200: openapi.Response(
+                description="Brand and product details saved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: openapi.Response(description="Bad request, validation error"),
+            401: openapi.Response(description="Authentication required"),
+            403: openapi.Response(description="Email or phone not verified"),
+            404: openapi.Response(description="Brand profile not found"),
+        }
+    )
+    def post(self, request):
+        # Check if user has verified email and phone
+        user = request.user
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
+
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+
+        serializer = BrandProductDetailsSerializer(data=request.data)
+        if serializer.is_valid():
+            # Get or create the Brand for this user
+            from brand.models import Brand
+            brand, created = Brand.objects.get_or_create(brand_user=brand_user)
+            brand.logo = serializer.validated_data['brand_logo']
+            brand.product_categories = serializer.validated_data['product_categories']
+            brand.gender = list(serializer.validated_data['gender'])
+            target_age_range = serializer.validated_data['target_age_groups']
+
+            if isinstance(target_age_range, list) and len(target_age_range) >= 2:
+                brand.min_age_group = int(target_age_range[0])
+                brand.max_age_group = int(target_age_range[1])
+            else:
+                brand.min_age_group = 0
+                brand.max_age_group = 100
+
+            price_range = serializer.validated_data['price_range']
+
+            if isinstance(price_range, list) and len(price_range) >= 2:
+                brand.min_price_range = float(price_range[0])
+                brand.max_price_range = float(price_range[1])
+            else:
+                brand.min_price_range = 0
+                brand.max_price_range = 100000
+
+            brand.average_order_value = 0
+            brand.total_skus = 0
+            brand.save()
+
+            if 'product_catalog' in serializer.validated_data:
+                # TODO: We don't process the CSV now as our team will look at it later
+                pass
+
+            brand_user.update_onboarding_status(8)
+
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Brand and product details saved successfully'
                 },
                 status=status.HTTP_200_OK
             )
@@ -699,61 +610,44 @@ class BankDetailsAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before saving bank details'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if product details are completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # In a real implementation, we would check if product details are completed
 
         serializer = BankDetailsSerializer(data=request.data)
         if serializer.is_valid():
-            # For now, we're just returning success without actually saving the data
-            # In a real implementation, we would:
-            # 1. Save the bank details to the brand profile
-            # 2. Save the cancelled cheque image to a file storage system
-            # 3. Initiate a micro-deposit to verify the bank account
+            from brand.models import BrandDetails
+            brand_details, created = BrandDetails.objects.get_or_create(brand_user=brand_user)
 
-            # Example of how we might save this data in the future:
-            # # Save bank details
-            # brand_user.account_holder_name = serializer.validated_data['account_holder_name']
-            # brand_user.account_number = serializer.validated_data['account_number']
-            # brand_user.ifsc_code = serializer.validated_data['ifsc_code']
-            # brand_user.save()
+            brand_details.account_holder_name = serializer.validated_data['account_holder_name']
+            brand_details.account_number = serializer.validated_data['account_number']
+            brand_details.ifsc_code = serializer.validated_data['ifsc_code']
 
-            # # Save cancelled cheque image
-            # cheque_file = serializer.validated_data['cancelled_cheque']
-            # cheque_filename = f"cheque_{brand_user.id}_{uuid.uuid4()}.{cheque_file.name.split('.')[-1]}"
-            # cheque_path = os.path.join('media', 'cancelled_cheques', cheque_filename)
-            # os.makedirs(os.path.dirname(cheque_path), exist_ok=True)
-            # with open(cheque_path, 'wb') as destination:
-            #     for chunk in cheque_file.chunks():
-            #         destination.write(chunk)
-            # brand_user.cancelled_cheque_path = cheque_path
+            if 'cancelled_cheque' in serializer.validated_data:
+                cheque_file = serializer.validated_data['cancelled_cheque']
+                cheque_filename = f"cheque_{brand_user.id}_{uuid.uuid4()}.{cheque_file.name.split('.')[-1]}"
+                cheque_path = os.path.join('media', 'cancelled_cheques', cheque_filename)
+                os.makedirs(os.path.dirname(cheque_path), exist_ok=True)
+                with open(cheque_path, 'wb') as destination:
+                    for chunk in cheque_file.chunks():
+                        destination.write(chunk)
+                brand_details.cancelled_cheque_path = cheque_path
 
-            # Generate a mock bank reference ID
             bank_reference_id = f"BANK-REF-{uuid.uuid4().hex[:8].upper()}"
+            brand_details.bank_reference_id = bank_reference_id
 
-            # In a real implementation, we would initiate a micro-deposit here
-            # and store the expected amount for verification later
+            import random
+            micro_deposit_amount = random.randint(1, 99) / 100
+            brand_details.micro_deposit_amount = micro_deposit_amount
+            brand_details.save()
 
-            # Update onboarding status to bank details completed
-            brand_user.update_onboarding_status(9)  # Move to final submission step
+            brand_user.update_onboarding_status(9)
 
             return Response(
                 {
@@ -800,63 +694,58 @@ class MicroDepositVerificationAPIView(APIView):
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before verifying micro-deposit'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if bank details are submitted
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+        # In a real implementation, we would check if bank details are saved
 
         serializer = MicroDepositVerificationSerializer(data=request.data)
         if serializer.is_valid():
-            # For now, we're just returning success without actually verifying the amount
-            # In a real implementation, we would:
-            # 1. Verify the bank_reference_id belongs to this user
-            # 2. Compare the amount_received with the actual amount deposited
-            # 3. Mark the bank account as verified if correct
+            # Get BrandDetails for this user
+            from brand.models import BrandDetails
+            try:
+                brand_details = BrandDetails.objects.get(brand_user=brand_user)
+            except BrandDetails.DoesNotExist:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'Bank details not found. Please submit your bank details first.'
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-            # Example of how we might verify this in the future:
-            # bank_reference_id = serializer.validated_data['bank_reference_id']
-            # amount_received = serializer.validated_data['amount_received']
-            #
-            # # Check if the reference ID is valid for this user
-            # if brand_user.bank_reference_id != bank_reference_id:
-            #     return Response(
-            #         {
-            #             'success': False,
-            #             'message': 'Invalid bank reference ID'
-            #         },
-            #         status=status.HTTP_400_BAD_REQUEST
-            #     )
-            #
-            # # Check if the amount matches
-            # if brand_user.micro_deposit_amount != amount_received:
-            #     return Response(
-            #         {
-            #             'success': False,
-            #             'message': 'Incorrect micro-deposit amount'
-            #         },
-            #         status=status.HTTP_422_UNPROCESSABLE_ENTITY
-            #     )
-            #
-            # # Mark the bank account as verified
-            # brand_user.is_bank_verified = True
-            # brand_user.save()
+            # Get verification data from request
+            bank_reference_id = serializer.validated_data['bank_reference_id']
+            amount_received = serializer.validated_data['amount_received']
+
+            # Check if the reference ID is valid for this user
+            if brand_details.bank_reference_id != bank_reference_id:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'Invalid bank reference ID'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if the amount matches
+            if float(brand_details.micro_deposit_amount) != float(amount_received):
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'Incorrect micro-deposit amount'
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+            # Mark the bank account as verified
+            brand_details.is_bank_verified = True
+            brand_details.save(update_fields=['is_bank_verified', 'updated_at'])
 
             return Response(
                 {
@@ -869,27 +758,214 @@ class MicroDepositVerificationAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class BrandProductDetailsAPIView(APIView):
-    """
-    API endpoint for saving brand and product details
 
-    Requires authentication, verified email and phone, and completed warehouse details
+class BrandOnboardingSummaryAPIView(APIView):
+    """
+    API endpoint for retrieving the complete brand onboarding summary
+
+    Requires authentication and verified email and phone
     """
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
-        operation_summary="Save brand and product details",
-        operation_description="Saves the brand logo, product categories, target demographics, and product catalog. Requires authenticated user with verified email, phone, and completed warehouse details.",
-        request_body=BrandProductDetailsSerializer,
+        operation_summary="Get brand onboarding summary",
+        operation_description="Retrieves the complete summary of all information provided during the onboarding process. Requires authenticated user with verified email and phone.",
         responses={
             200: openapi.Response(
-                description="Brand and product details saved successfully",
+                description="Brand onboarding summary retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'basic_info': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'gst_info': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'signature_info': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'business_preference': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'warehouse_details': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'product_details': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'bank_details': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'verification_status': openapi.Schema(type=openapi.TYPE_OBJECT),
+                            }
+                        )
+                    }
+                )
+            ),
+            401: openapi.Response(description="Authentication required"),
+            403: openapi.Response(description="Email or phone not verified"),
+            404: openapi.Response(description="Brand profile not found"),
+        }
+    )
+    def get(self, request):
+        # Check if user has verified email and phone
+        user = request.user
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
+
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
+
+        # Fetch actual data from the database
+        from brand.models import BrandDetails, Brand, State, Warehouse
+
+        # Get user details
+        user_details = {
+            'owner_name': user.get_full_name(),
+            'contact_number': user.phone_number,
+            'email': user.email,
+        }
+
+        # Get brand details
+        try:
+            brand_details = BrandDetails.objects.get(brand_user=brand_user)
+            brand_details_data = {
+                'company_name': brand_details.company_name or '',
+                'company_type': brand_details.company_type or '',
+                'address': brand_details.address or '',
+                'gst_number': brand_details.gst_number or '',
+                'signature_id': brand_details.signature_id or '',
+                'tan_number': brand_details.tan_number or '',
+                'daily_order_volume': brand_details.daily_order_volume or 0,
+                'account_holder_name': brand_details.account_holder_name or '',
+                'account_number': brand_details.account_number or '',
+                'ifsc_code': brand_details.ifsc_code or '',
+                'cancelled_cheque_path': brand_details.cancelled_cheque_path or '',
+                'bank_reference_id': brand_details.bank_reference_id or '',
+                'is_bank_verified': brand_details.is_bank_verified,
+                'onboarding_id': brand_details.onboarding_id or '',
+                'terms_accepted': brand_details.terms_accepted,
+                'privacy_policy_accepted': brand_details.privacy_policy_accepted,
+                'onboarding_completed': brand_details.onboarding_completed,
+                'verification_status': brand_details.verification_status,
+            }
+        except BrandDetails.DoesNotExist:
+            brand_details_data = {}
+
+        # Get brand information
+        try:
+            brand = Brand.objects.get(brand_user=brand_user)
+            brand_data = {
+                'brand_name': brand.name or '',
+                'brand_logo': brand.logo.url if brand.logo else '',
+                'product_categories': brand.product_categories or [],
+                'gender': brand.gender or [],
+                'min_age_group': brand.min_age_group or 0,
+                'max_age_group': brand.max_age_group or 0,
+                'min_price_range': float(brand.min_price_range) if brand.min_price_range else 0,
+                'max_price_range': float(brand.max_price_range) if brand.max_price_range else 0,
+                'average_order_value': float(brand.average_order_value) if brand.average_order_value else 0,
+                'total_skus': brand.total_skus or 0,
+            }
+
+            # Get warehouse details
+            states = State.objects.filter(brand=brand)
+            city_warehouses = []
+            for state in states:
+                warehouses = Warehouse.objects.filter(state=state)
+                city_warehouses.append({
+                    'city_name': state.name,
+                    'warehouse_count': warehouses.count(),
+                    'warehouses': [{
+                        'code': w.code,
+                        'type': w.type,
+                        'address': w.address
+                    } for w in warehouses]
+                })
+        except Brand.DoesNotExist:
+            brand_data = {}
+            city_warehouses = []
+
+        # Compile all data
+        summary_data = {
+            'basic_info': {
+                **user_details,
+                'company_name': brand_details_data.get('company_name', ''),
+                'company_type': brand_details_data.get('company_type', ''),
+                'address': brand_details_data.get('address', ''),
+            },
+            'gst_info': {
+                'gst_number': brand_details_data.get('gst_number', ''),
+                'company_name': brand_details_data.get('company_name', ''),
+                'verification_status': 'Verified' if brand_user.gst_verified else 'Not Verified',
+            },
+            'signature_info': {
+                'signature_id': brand_details_data.get('signature_id', ''),
+                'tan_number': brand_details_data.get('tan_number', ''),
+            },
+            'business_preference': {
+                'preference': brand_user.business_preference or '',
+                'description': dict(brand_user.BUSINESS_PREFERENCE_CHOICES).get(brand_user.business_preference, '') if brand_user.business_preference else '',
+            },
+            'warehouse_details': {
+                'city_warehouses': city_warehouses,
+                'daily_order_volume': brand_details_data.get('daily_order_volume', 0),
+            },
+            'product_details': {
+                'brand_logo': brand_data.get('brand_logo', ''),
+                'product_categories': brand_data.get('product_categories', []),
+                'gender': brand_data.get('gender', []),
+                'age_group_range': [brand_data.get('min_age_group', 0), brand_data.get('max_age_group', 0)],
+                'price_range': [brand_data.get('min_price_range', 0), brand_data.get('max_price_range', 0)],
+                'average_order_value': brand_data.get('average_order_value', 0),
+                'total_skus': brand_data.get('total_skus', 0),
+            },
+            'bank_details': {
+                'account_holder_name': brand_details_data.get('account_holder_name', ''),
+                'account_number': brand_details_data.get('account_number', ''),
+                'ifsc_code': brand_details_data.get('ifsc_code', ''),
+                'cancelled_cheque_uploaded': bool(brand_details_data.get('cancelled_cheque_path', '')),
+                'bank_reference_id': brand_details_data.get('bank_reference_id', ''),
+                'bank_verification_status': 'Verified' if brand_details_data.get('is_bank_verified', False) else 'Not Verified',
+            },
+            'verification_status': {
+                'email_verified': user.is_email_verified,
+                'phone_verified': user.is_phone_verified,
+                'gst_verified': brand_user.gst_verified,
+                'bank_verified': brand_details_data.get('is_bank_verified', False),
+                'onboarding_complete': brand_details_data.get('onboarding_completed', False),
+                'onboarding_id': brand_details_data.get('onboarding_id', ''),
+                'terms_accepted': brand_details_data.get('terms_accepted', False),
+                'privacy_policy_accepted': brand_details_data.get('privacy_policy_accepted', False),
+                'onboarding_status': brand_user.onboarding_status,
+                'onboarding_status_details': brand_user.get_onboarding_status_details(),
+            }
+        }
+
+        return Response(
+            {
+                'success': True,
+                'data': summary_data
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class FinalSubmissionAPIView(APIView):
+    """
+    API endpoint for final submission of the onboarding process
+
+    Requires authentication, verified email and phone, and completed all previous steps
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Submit final onboarding",
+        operation_description="Completes the onboarding process by accepting terms and conditions. Requires authenticated user with verified email, phone, and completed all previous onboarding steps.",
+        request_body=FinalSubmissionSerializer,
+        responses={
+            200: openapi.Response(
+                description="Onboarding completed successfully",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
                         'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
                         'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'onboarding_id': openapi.Schema(type=openapi.TYPE_STRING),
                     }
                 )
             ),
@@ -897,164 +973,83 @@ class BrandProductDetailsAPIView(APIView):
             401: openapi.Response(description="Authentication required"),
             403: openapi.Response(description="Email or phone not verified"),
             404: openapi.Response(description="Brand profile not found"),
+            422: openapi.Response(description="Incomplete onboarding steps"),
         }
     )
     def post(self, request):
         # Check if user has verified email and phone
         user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before saving brand and product details'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        is_verified, error_response = check_user_verification(user)
+        if not is_verified:
+            return error_response
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if warehouse details are completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get brand user
+        brand_user, error_response = get_brand_user(user)
+        if error_response:
+            return error_response
 
-        serializer = BrandProductDetailsSerializer(data=request.data)
+        serializer = FinalSubmissionSerializer(data=request.data)
         if serializer.is_valid():
-            # For now, we're just returning success without actually saving the data
-            # In a real implementation, we would:
-            # 1. Save the brand logo to a file storage system
-            # 2. Save the product categories, gender, age groups, and price range to the brand profile
-            # 3. Process and store the product catalog CSV file
+            # Check if all required onboarding steps are completed
+            # We can use the onboarding_status to check this
+            if brand_user.onboarding_status < 9:  # 9 means bank details are completed
+                # Determine which steps are incomplete
+                incomplete_steps = []
+                onboarding_status = brand_user.onboarding_status
 
-            # Example of how we might save this data in the future:
-            # # Save brand logo
-            # logo_file = serializer.validated_data['brand_logo']
-            # logo_filename = f"brand_logo_{brand_user.id}_{uuid.uuid4()}.{logo_file.name.split('.')[-1]}"
-            # logo_path = os.path.join('media', 'brand_logos', logo_filename)
-            # os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-            # with open(logo_path, 'wb') as destination:
-            #     for chunk in logo_file.chunks():
-            #         destination.write(chunk)
-            # brand_user.logo_path = logo_path
+                if onboarding_status < 3:
+                    incomplete_steps.append('GST Verification')
+                if onboarding_status < 4:
+                    incomplete_steps.append('Brand Basic Information')
+                if onboarding_status < 5:
+                    incomplete_steps.append('Signature and TAN')
+                if onboarding_status < 6:
+                    incomplete_steps.append('Business Preference')
+                if onboarding_status < 7:
+                    incomplete_steps.append('Warehouse Details')
+                if onboarding_status < 8:
+                    incomplete_steps.append('Product Details')
+                if onboarding_status < 9:
+                    incomplete_steps.append('Bank Details')
 
-            # # Save product categories
-            # brand_user.product_categories = serializer.validated_data['product_categories']
-            # brand_user.gender_focus = serializer.validated_data['gender']
-            # brand_user.target_age_groups = serializer.validated_data['target_age_groups']
-            # brand_user.price_range = serializer.validated_data['price_range']
-            # brand_user.save()
-
-            # # Process product catalog if provided
-            # if 'product_catalog' in serializer.validated_data:
-            #     catalog_file = serializer.validated_data['product_catalog']
-            #     catalog_filename = f"product_catalog_{brand_user.id}_{uuid.uuid4()}.{catalog_file.name.split('.')[-1]}"
-            #     catalog_path = os.path.join('media', 'product_catalogs', catalog_filename)
-            #     os.makedirs(os.path.dirname(catalog_path), exist_ok=True)
-            #     with open(catalog_path, 'wb') as destination:
-            #         for chunk in catalog_file.chunks():
-            #             destination.write(chunk)
-            #     # TODO: Parse CSV and load products into database
-
-            # Update onboarding status to product details completed
-            brand_user.update_onboarding_status(8)  # Move to bank details step
-
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Brand and product details saved successfully'
-                },
-                status=status.HTTP_200_OK
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class WarehouseDetailsAPIView(APIView):
-    """
-    API endpoint for saving warehouse details for brands
-
-    Requires authentication, verified email and phone, and completed business preference selection
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="Save warehouse details",
-        operation_description="Saves the warehouse details for the brand including city locations, warehouse count per city, and daily order volume. Requires authenticated user with verified email, phone, and completed business preference selection.",
-        request_body=WarehouseDetailsSerializer,
-        responses={
-            200: openapi.Response(
-                description="Warehouse details saved successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    }
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'Please complete all required onboarding steps',
+                        'incomplete_steps': incomplete_steps
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
                 )
-            ),
-            400: openapi.Response(description="Bad request, validation error"),
-            401: openapi.Response(description="Authentication required"),
-            403: openapi.Response(description="Email or phone not verified"),
-            404: openapi.Response(description="Brand profile not found"),
-        }
-    )
-    def post(self, request):
-        # Check if user has verified email and phone
-        user = request.user
-        if not user.is_email_verified or not user.is_phone_verified:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Both email and phone must be verified before saving warehouse details'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
 
-        # Check if the brand exists
-        try:
-            brand_user = BrandUser.objects.get(user=user)
-            # In a real implementation, we would check if business preference is completed
-        except BrandUser.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Brand profile not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+            from brand.models import BrandDetails
+            from django.utils import timezone
+            brand_details, created = BrandDetails.objects.get_or_create(brand_user=brand_user)
 
-        serializer = WarehouseDetailsSerializer(data=request.data)
-        if serializer.is_valid():
-            # For now, we're just returning success without actually saving the data
-            # In a real implementation, we would:
-            # 1. Save the warehouse details to the brand profile or related models
-            # 2. Process the city_warehouses list and create appropriate records
+            brand_details.terms_accepted = serializer.validated_data['terms_accepted']
+            brand_details.privacy_policy_accepted = serializer.validated_data['privacy_policy_accepted']
+            brand_details.onboarding_completed = True
+            brand_details.onboarding_completed_at = timezone.now()
 
-            # Example of how we might save this data in the future:
-            # brand_user.daily_order_volume = serializer.validated_data['daily_order_volume']
-            # brand_user.save()
-            #
-            # For city_warehouses, we might create related records:
-            # for city_warehouse in serializer.validated_data['city_warehouses']:
-            #     BrandWarehouse.objects.create(
-            #         brand_user=brand_user,
-            #         city_name=city_warehouse['city_name'],
-            #         warehouse_count=city_warehouse['warehouse_count']
-            #     )
+            brand_details.verification_status = 1
+            brand_details.save()
 
-            # Update onboarding status to warehouse details completed
-            brand_user.update_onboarding_status(7)  # Move to product details step
+            from brand.helpers import generate_unique_onboarding_id
+            onboarding_id = generate_unique_onboarding_id()
+            brand_details.onboarding_id = onboarding_id
+            brand_details.save(update_fields=['onboarding_id'])
+
+            brand_user.update_onboarding_status(10)
 
             return Response(
                 {
                     'success': True,
-                    'message': 'Warehouse details saved successfully'
+                    'message': 'Onboarding completed successfully. Your account is now under review.',
+                    'onboarding_id': onboarding_id,
+                    'verification_status': {
+                        'code': 1,
+                        'status': 'Pending',
+                        'message': 'Your brand profile is pending verification by our team.'
+                    }
                 },
                 status=status.HTTP_200_OK
             )
