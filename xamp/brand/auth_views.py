@@ -9,7 +9,6 @@ from drf_yasg import openapi
 from .models import BrandUser
 from .serializers import EmailPasswordSignupSerializer, EmailPasswordLoginSerializer
 from django.contrib.auth import authenticate
-from .oauth_utils import get_google_auth_url
 
 User = get_user_model()
 

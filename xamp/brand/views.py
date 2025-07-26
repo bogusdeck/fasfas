@@ -13,7 +13,7 @@ from .serializers import (
     RequestPhoneOTPSerializer, VerifyPhoneOTPSerializer,
     RequestEmailOTPSerializer, VerifyEmailOTPSerializer,
     BrandUserSerializer, UserSerializer, BrandProfileUpdateSerializer,
-    GoogleAuthSerializer, EmailPasswordSignupSerializer
+    EmailPasswordSignupSerializer
 )
 from .models import BrandUser
 
@@ -361,102 +361,6 @@ class VerifyEmailOTPAPIView(APIView):
             else:
                 return Response(
                     {'success': False, 'message': message},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class GoogleAuthAPIView(APIView):
-    """
-    API endpoint for Google OAuth authentication for brands
-
-    Authenticates a user using Google OAuth2 token
-    """
-    permission_classes = [permissions.AllowAny]
-
-    @swagger_auto_schema(
-        operation_summary="Google OAuth Authentication",
-        operation_description="Authenticate a user using Google OAuth2 token",
-        request_body=GoogleAuthSerializer,
-        responses={
-            200: openapi.Response(
-                description="Authentication successful",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'is_new_user': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    }
-                )
-            ),
-            400: openapi.Response(description="Bad request, validation error"),
-        }
-    )
-    def post(self, request):
-        serializer = GoogleAuthSerializer(data=request.data)
-        if serializer.is_valid():
-            auth_token = serializer.validated_data['auth_token']
-
-            # Verify the token with Google
-            try:
-                # Get user info from Google
-                google_response = requests.get(
-                    'https://www.googleapis.com/oauth2/v3/userinfo',
-                    headers={'Authorization': f'Bearer {auth_token}'}
-                )
-
-                if google_response.status_code != 200:
-                    return Response(
-                        {'success': False, 'message': 'Invalid Google token'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                user_info = google_response.json()
-                email = user_info.get('email')
-
-                if not email:
-                    return Response(
-                        {'success': False, 'message': 'Email not found in Google response'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                # Check if user exists
-                try:
-                    user = User.objects.get(email=email)
-                    is_new_user = False
-                except User.DoesNotExist:
-                    # Create a new user
-                    user = User.objects.create(
-                        email=email,
-                        first_name=user_info.get('given_name', ''),
-                        last_name=user_info.get('family_name', ''),
-                        is_email_verified=True  # Email is verified by Google
-                    )
-                    is_new_user = True
-
-                # Create or get brand user profile
-                brand_user, created = BrandUser.objects.get_or_create(user=user)
-
-                # Generate JWT tokens
-                refresh = RefreshToken.for_user(user)
-
-                return Response({
-                    'success': True,
-                    'message': 'Google authentication successful',
-                    'token': {
-                        'refresh': str(refresh),
-                        'access': str(refresh.access_token),
-                    },
-                    'is_new_user': is_new_user,
-                    'user_id': user.id
-                }, status=status.HTTP_200_OK)
-
-            except Exception as e:
-                return Response(
-                    {'success': False, 'message': f'Authentication error: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 

@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 class BrandUser(models.Model):
@@ -135,4 +137,188 @@ class BrandPendingTask(models.Model):
         # Auto-update status to overdue if past due date
         if self.is_overdue and self.status == 'pending':
             self.status = 'overdue'
+        super().save(*args, **kwargs)
+
+
+class Brand(models.Model):
+    """
+    Model to represent a brand/company
+    """
+    brand_user = models.OneToOneField(BrandUser, on_delete=models.CASCADE, related_name='brand')
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+    logo = models.ImageField(upload_to='brand_logos/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def total_states(self):
+        return self.states.count()
+
+    @property
+    def total_warehouses(self):
+        return sum(state.warehouses.count() for state in self.states.all())
+
+    @property
+    def total_products(self):
+        return Product.objects.filter(warehouses__state__brand=self).distinct().count()
+
+
+class State(models.Model):
+    """
+    Model to represent states/cities where brand operates
+    """
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='states')
+    name = models.CharField(max_length=100)
+    state_code = models.CharField(max_length=10, blank=True, null=True)
+    country = models.CharField(max_length=100, default='India')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ['brand', 'name']  # Same brand can't have duplicate state names
+
+    def __str__(self):
+        return f"{self.name} - {self.brand.name}"
+
+    @property
+    def total_warehouses(self):
+        return self.warehouses.count()
+
+    @property
+    def total_products(self):
+        return Product.objects.filter(warehouses__state=self).distinct().count()
+
+
+class Warehouse(models.Model):
+    """
+    Model to represent warehouses in different states
+    """
+    WAREHOUSE_TYPES = (
+        ('main', 'Main Warehouse'),
+        ('distribution', 'Distribution Center'),
+        ('retail', 'Retail Store'),
+        ('fulfillment', 'Fulfillment Center'),
+    )
+
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='warehouses')
+    name = models.CharField(max_length=255)
+    warehouse_code = models.CharField(max_length=50, unique=True)
+    warehouse_type = models.CharField(max_length=20, choices=WAREHOUSE_TYPES, default='main')
+    address = models.TextField()
+    contact_person = models.CharField(max_length=255, blank=True, null=True)
+    contact_phone = models.CharField(max_length=20, blank=True, null=True)
+    contact_email = models.EmailField(blank=True, null=True)
+    capacity = models.PositiveIntegerField(help_text="Storage capacity in square feet", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ['state', 'name']  # Same state can't have duplicate warehouse names
+
+    def __str__(self):
+        return f"{self.name} ({self.warehouse_code}) - {self.state.name}"
+
+    @property
+    def total_products(self):
+        return self.products.count()
+
+    @property
+    def brand(self):
+        return self.state.brand
+
+
+class Product(models.Model):
+    """
+    Model to represent products that can be stored in multiple warehouses
+    """
+    PRODUCT_STATUS = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('discontinued', 'Discontinued'),
+        ('out_of_stock', 'Out of Stock'),
+    )
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
+    name = models.CharField(max_length=255)
+    sku = models.CharField(max_length=100, unique=True, help_text="Stock Keeping Unit")
+    description = models.TextField(blank=True, null=True)
+    category = models.CharField(max_length=100, blank=True, null=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MinValueValidator(Decimal('0.01'))])
+    weight = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True, help_text="Weight in kg")
+    dimensions = models.CharField(max_length=100, blank=True, null=True, help_text="L x W x H in cm")
+    image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    status = models.CharField(max_length=20, choices=PRODUCT_STATUS, default='active')
+    warehouses = models.ManyToManyField(Warehouse, through='ProductWarehouse', related_name='products')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ['brand', 'sku']  # Same brand can't have duplicate SKUs
+
+    def __str__(self):
+        return f"{self.name} ({self.sku}) - {self.brand.name}"
+
+    @property
+    def total_stock(self):
+        return sum(pw.quantity for pw in self.productwarehouse_set.all())
+
+    @property
+    def warehouse_count(self):
+        return self.warehouses.count()
+
+    def get_stock_in_warehouse(self, warehouse):
+        try:
+            return self.productwarehouse_set.get(warehouse=warehouse).quantity
+        except ProductWarehouse.DoesNotExist:
+            return 0
+
+
+class ProductWarehouse(models.Model):
+    """
+    Intermediate model to store product quantities in specific warehouses
+    """
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=0)
+    minimum_stock_level = models.PositiveIntegerField(default=10, help_text="Minimum stock level for reorder")
+    maximum_stock_level = models.PositiveIntegerField(blank=True, null=True, help_text="Maximum stock level")
+    last_restocked = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['product', 'warehouse']
+        ordering = ['-quantity']
+
+    def __str__(self):
+        return f"{self.product.name} in {self.warehouse.name}: {self.quantity} units"
+
+    @property
+    def is_low_stock(self):
+        return self.quantity <= self.minimum_stock_level
+
+    @property
+    def is_out_of_stock(self):
+        return self.quantity == 0
+
+    def save(self, *args, **kwargs):
+        # Update last_restocked when quantity increases
+        if self.pk:
+            old_quantity = ProductWarehouse.objects.get(pk=self.pk).quantity
+            if self.quantity > old_quantity:
+                self.last_restocked = timezone.now()
         super().save(*args, **kwargs)

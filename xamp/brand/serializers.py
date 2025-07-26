@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import BrandUser, Announcement
-import requests
+from .models import BrandUser, Announcement, BrandPendingTask
 
 User = get_user_model()
 
@@ -46,18 +45,6 @@ class BrandProfileUpdateSerializer(serializers.Serializer):
     industry = serializers.CharField(required=False)
 
 
-class GoogleAuthSerializer(serializers.Serializer):
-    auth_token = serializers.CharField(required=True)
-
-    def validate_auth_token(self, auth_token):
-        """
-        Validate the Google auth token by making a request to the Google OAuth2 API
-        """
-        if not auth_token:
-            raise serializers.ValidationError("Auth token is required")
-        return auth_token
-
-
 class EmailPasswordSignupSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True, min_length=8)
@@ -68,11 +55,6 @@ class EmailPasswordSignupSerializer(serializers.Serializer):
 class EmailPasswordLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
-
-
-class GoogleAuthCallbackSerializer(serializers.Serializer):
-    code = serializers.CharField(required=True)
-    state = serializers.CharField(required=False)
 
 
 class GSTVerificationSerializer(serializers.Serializer):

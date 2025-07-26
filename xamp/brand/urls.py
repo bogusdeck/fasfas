@@ -1,10 +1,8 @@
 from django.urls import path
 from .views import (RequestPhoneOTPAPIView, VerifyPhoneOTPAPIView,
                    RequestEmailOTPAPIView, VerifyEmailOTPAPIView,
-                   BrandDashboardAPIView, BrandProfileUpdateAPIView, GoogleAuthAPIView)
+                   BrandDashboardAPIView, BrandProfileUpdateAPIView)
 from .auth_views import EmailPasswordSignupAPIView, EmailPasswordLoginAPIView
-from .google_auth_views import GoogleAuthURLAPIView
-from .google_auth_callback_view import GoogleAuthCallbackAPIView
 from .onboarding import (
     GSTVerificationAPIView, BrandBasicInfoAPIView,
     SignatureUploadAPIView, SaveSignatureAndTANAPIView,
@@ -29,11 +27,6 @@ urlpatterns = [
     # Brand dashboard and profile
     path('dashboard/', BrandDashboardAPIView.as_view(), name='brand_dashboard'),
     path('profile/update/', BrandProfileUpdateAPIView.as_view(), name='brand_profile_update'),
-
-    # Google authentication
-    path('auth/google/url/', GoogleAuthURLAPIView.as_view(), name='google_auth_url'),
-    path('auth/google/callback/', GoogleAuthCallbackAPIView.as_view(), name='google_auth_callback'),
-    path('auth/google/', GoogleAuthAPIView.as_view(), name='google_auth'),
 
     # Email/Password authentication
     path('auth/signup/', EmailPasswordSignupAPIView.as_view(), name='email_password_signup'),
