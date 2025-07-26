@@ -28,9 +28,11 @@ class BrandOTPService:
                 user = User.objects.get(phone_number=phone_number)
             except User.DoesNotExist:
                 # Create a new user with just the phone number
+                # No need to set email as it can now be null
                 with transaction.atomic():
                     user = User.objects.create(
                         phone_number=phone_number,
+                        email=None,  # Explicitly set to None for clarity
                         is_active=True,  # User is active but not verified yet
                         is_phone_verified=False
                     )
