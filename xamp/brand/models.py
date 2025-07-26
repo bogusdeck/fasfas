@@ -9,16 +9,61 @@ class BrandUser(models.Model):
     """
     Model to store brand-specific user information
     """
+    ONBOARDING_STATUS_CHOICES = (
+        (0, 'Phone Not Verified'),
+        (1, 'Email Not Verified'),
+        (2, 'GST Not Verified'),
+        (3, 'Brand Info Not Added'),
+        (4, 'Signature Not Uploaded'),
+        (5, 'Business Preference Not Uploaded'),
+        (6, 'Warehouse Details Not Uploaded'),
+        (7, 'Product Details Not Added'),
+        (8, 'Bank Details Not Uploaded'),
+        (9, 'Final Submission Not Done'),
+        (10, 'Onboarding Complete'),
+    )
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='brand_profile')
     company_name = models.CharField(max_length=255, blank=True, null=True)
     website = models.URLField(blank=True, null=True)
     industry = models.CharField(max_length=100, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
+    onboarding_status = models.IntegerField(choices=ONBOARDING_STATUS_CHOICES, default=0, help_text="Current onboarding step status")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.email or self.user.phone_number} - Brand Profile"
+
+    def get_onboarding_status_details(self):
+        """
+        Returns detailed onboarding status information
+        """
+        status_map = {
+            0: {'code': '01', 'message': 'Phone is not verified', 'step': 'phone_verification'},
+            1: {'code': '02', 'message': 'Email is not verified', 'step': 'email_verification'},
+            2: {'code': '03', 'message': 'GST is not verified', 'step': 'gst_verification'},
+            3: {'code': '04', 'message': 'Brand info is not added', 'step': 'brand_info'},
+            4: {'code': '05', 'message': 'Signature is not uploaded', 'step': 'signature_upload'},
+            5: {'code': '06', 'message': 'Business preference is not uploaded', 'step': 'business_preference'},
+            6: {'code': '07', 'message': 'Warehouse details is not uploaded', 'step': 'warehouse_details'},
+            7: {'code': '08', 'message': 'Product details is not added', 'step': 'product_details'},
+            8: {'code': '09', 'message': 'Bank details/verification is not uploaded', 'step': 'bank_details'},
+            9: {'code': '10', 'message': 'Terms and condition is not accepted', 'step': 'final_submission'},
+            10: {'code': '00', 'message': 'Onboarding complete', 'step': 'completed'},
+        }
+
+        return status_map.get(self.onboarding_status, status_map[0])
+
+    def update_onboarding_status(self, new_status):
+        """
+        Update onboarding status if the new status is greater than current
+        """
+        if new_status > self.onboarding_status:
+            self.onboarding_status = new_status
+            self.save(update_fields=['onboarding_status', 'updated_at'])
+            return True
+        return False
 
 
 class BrandDetails(models.Model):

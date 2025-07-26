@@ -278,7 +278,138 @@ Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b
 
 For browser-based applications, the session cookie will be automatically included in requests after login.
 
-## Brand API Endpoints
+## Brand Profile Status API
+
+### Get Brand Profile Status
+**Endpoint:** `GET /api/brand/profile/status/`
+
+**Description:** **⚠️ IMPORTANT: This API should be called FIRST after user login to determine the user's onboarding status and guide them to the appropriate next step.**
+
+This endpoint returns the current onboarding status of the brand user with specific status codes to help the frontend determine what step the user should complete next.
+
+**Headers:**
+```
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Profile status retrieved successfully",
+  "data": {
+    "profile": {
+      "id": 1,
+      "company_name": "Example Corp",
+      "website": "https://example.com",
+      "industry": "Technology",
+      "is_verified": false,
+      "onboarding_status": 3,
+      "onboarding_status_details": {
+        "code": "04",
+        "message": "Brand info is not added",
+        "step": "brand_info"
+      },
+      "user_details": {
+        "id": 1,
+        "email": "user@example.com",
+        "phone_number": "+919876543210",
+        "is_email_verified": true,
+        "is_phone_verified": true
+      },
+      "created_at": "2025-01-27T00:00:00Z",
+      "updated_at": "2025-01-27T00:00:00Z"
+    },
+    "status_code": "04",
+    "status_message": "Brand info is not added",
+    "current_step": "brand_info",
+    "is_onboarding_complete": false,
+    "onboarding_progress": {
+      "current_step": 3,
+      "total_steps": 10,
+      "percentage": 30
+    }
+  }
+}
+```
+
+**Status Codes and Frontend Actions:**
+
+| Status Code | Message | Next Step | Frontend Action |
+|-------------|---------|-----------|----------------|
+| `01` | Phone is not verified | phone_verification | Redirect to phone OTP page |
+| `02` | Email is not verified | email_verification | Redirect to email OTP page |
+| `03` | GST is not verified | gst_verification | Redirect to GST verification page |
+| `04` | Brand info is not added | brand_info | Redirect to basic info form |
+| `05` | Signature is not uploaded | signature_upload | Redirect to signature upload page |
+| `06` | Business preference is not uploaded | business_preference | Redirect to business preference page |
+| `07` | Warehouse details is not uploaded | warehouse_details | Redirect to warehouse details page |
+| `08` | Product details is not added | product_details | Redirect to product details page |
+| `09` | Bank details/verification is not uploaded | bank_details | Redirect to bank details page |
+| `10` | Terms and condition is not accepted | final_submission | Redirect to final submission page |
+| `00` | Onboarding complete | completed | Redirect to dashboard |
+
+**Usage in Frontend:**
+```javascript
+// Call this API immediately after login
+const response = await fetch('/api/brand/profile/status/', {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
+
+const data = await response.json();
+const statusCode = data.data.status_code;
+
+// Route user based on status code
+switch(statusCode) {
+  case '01':
+    router.push('/onboarding/phone-verification');
+    break;
+  case '02':
+    router.push('/onboarding/email-verification');
+    break;
+  case '03':
+    router.push('/onboarding/gst-verification');
+    break;
+  case '04':
+    router.push('/onboarding/brand-info');
+    break;
+  case '05':
+    router.push('/onboarding/signature-upload');
+    break;
+  case '06':
+    router.push('/onboarding/business-preference');
+    break;
+  case '07':
+    router.push('/onboarding/warehouse-details');
+    break;
+  case '08':
+    router.push('/onboarding/product-details');
+    break;
+  case '09':
+    router.push('/onboarding/bank-details');
+    break;
+  case '10':
+    router.push('/onboarding/final-submission');
+    break;
+  case '00':
+    router.push('/dashboard');
+    break;
+}
+```
+
+**Response (500 Internal Server Error):**
+```json
+{
+  "success": false,
+  "message": "Error retrieving profile status: [error details]"
+}
+```
+
+---
+
+## Brand Onboarding API Endpoints
 
 ### GST Verification
 **Endpoint:** `POST /api/brand/gst/verify/`

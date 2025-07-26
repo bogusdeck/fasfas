@@ -187,3 +187,21 @@ class BrandPendingTaskSerializer(serializers.ModelSerializer):
                   'completion_date', 'is_actionable', 'action_url', 'is_overdue',
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class BrandProfileStatusSerializer(serializers.ModelSerializer):
+    """
+    Serializer for brand profile status API
+    """
+    onboarding_status_details = serializers.SerializerMethodField()
+    user_details = UserSerializer(source='user', read_only=True)
+    
+    class Meta:
+        model = BrandUser
+        fields = ['id', 'company_name', 'website', 'industry', 'is_verified', 
+                  'onboarding_status', 'onboarding_status_details', 'user_details',
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_onboarding_status_details(self, obj):
+        return obj.get_onboarding_status_details()

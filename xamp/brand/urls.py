@@ -3,6 +3,7 @@ from .views import (RequestPhoneOTPAPIView, VerifyPhoneOTPAPIView,
                    RequestEmailOTPAPIView, VerifyEmailOTPAPIView,
                    BrandDashboardAPIView, BrandProfileUpdateAPIView)
 from .auth_views import EmailPasswordSignupAPIView, EmailPasswordLoginAPIView
+from .profile_views import BrandProfileStatusAPIView
 from .onboarding import (
     GSTVerificationAPIView, BrandBasicInfoAPIView,
     SignatureUploadAPIView, SaveSignatureAndTANAPIView,
@@ -31,6 +32,9 @@ urlpatterns = [
     # Email/Password authentication
     path('auth/signup/', EmailPasswordSignupAPIView.as_view(), name='email_password_signup'),
     path('auth/login/', EmailPasswordLoginAPIView.as_view(), name='email_password_login'),
+
+    # Profile Status API
+    path('profile/status/', BrandProfileStatusAPIView.as_view(), name='brand_profile_status'),
 
     # GST verification
     path('gst/verify/', GSTVerificationAPIView.as_view(), name='gst_verification'),

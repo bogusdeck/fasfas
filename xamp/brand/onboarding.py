@@ -58,6 +58,12 @@ class GSTVerificationAPIView(APIView):
 
         serializer = GSTVerificationSerializer(data=request.data)
         if serializer.is_valid():
+            # Get or create brand user
+            brand_user, created = BrandUser.objects.get_or_create(user=user)
+
+            # Update onboarding status to GST verified
+            brand_user.update_onboarding_status(3)  # Move to brand info step
+
             # XXX: For now, we're just returning success without any actual verification logic
             return Response(
                 {
@@ -151,6 +157,9 @@ class BrandBasicInfoAPIView(APIView):
                     'address': serializer.validated_data['address']
                 }
             )
+
+            # Update onboarding status to brand info completed
+            brand_user.update_onboarding_status(4)  # Move to signature upload step
 
             return Response(
                 {
@@ -305,6 +314,9 @@ class SaveSignatureAndTANAPIView(APIView):
             # brand_user.signature_id = serializer.validated_data['signature_id']
             # brand_user.tan_number = serializer.validated_data.get('tan_number', '')
             # brand_user.save()
+
+            # Update onboarding status to signature uploaded
+            brand_user.update_onboarding_status(5)  # Move to business preference step
 
             return Response(
                 {
@@ -555,6 +567,9 @@ class FinalSubmissionAPIView(APIView):
             # Generate a mock onboarding ID
             onboarding_id = f"ONBOARD-{user.id}-{brand_user.id}"
 
+            # Update onboarding status to completed
+            brand_user.update_onboarding_status(10)  # Onboarding complete
+
             return Response(
                 {
                     'success': True,
@@ -635,6 +650,9 @@ class BusinessPreferenceAPIView(APIView):
             # Example of how we might save this data in the future:
             # brand_user.business_preference = serializer.validated_data['business_preference']
             # brand_user.save()
+
+            # Update onboarding status to business preference completed
+            brand_user.update_onboarding_status(6)  # Move to warehouse details step
 
             return Response(
                 {
@@ -733,6 +751,9 @@ class BankDetailsAPIView(APIView):
 
             # In a real implementation, we would initiate a micro-deposit here
             # and store the expected amount for verification later
+
+            # Update onboarding status to bank details completed
+            brand_user.update_onboarding_status(9)  # Move to final submission step
 
             return Response(
                 {
@@ -940,6 +961,9 @@ class BrandProductDetailsAPIView(APIView):
             #             destination.write(chunk)
             #     # TODO: Parse CSV and load products into database
 
+            # Update onboarding status to product details completed
+            brand_user.update_onboarding_status(8)  # Move to bank details step
+
             return Response(
                 {
                     'success': True,
@@ -1023,6 +1047,9 @@ class WarehouseDetailsAPIView(APIView):
             #         city_name=city_warehouse['city_name'],
             #         warehouse_count=city_warehouse['warehouse_count']
             #     )
+
+            # Update onboarding status to warehouse details completed
+            brand_user.update_onboarding_status(7)  # Move to product details step
 
             return Response(
                 {

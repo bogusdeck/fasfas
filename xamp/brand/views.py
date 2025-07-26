@@ -13,7 +13,7 @@ from .serializers import (
     RequestPhoneOTPSerializer, VerifyPhoneOTPSerializer,
     RequestEmailOTPSerializer, VerifyEmailOTPSerializer,
     BrandUserSerializer, UserSerializer, BrandProfileUpdateSerializer,
-    EmailPasswordSignupSerializer
+    EmailPasswordSignupSerializer, BrandProfileStatusSerializer
 )
 from .models import BrandUser
 
@@ -118,8 +118,12 @@ class VerifyPhoneOTPAPIView(APIView):
                     brand_user = BrandUser.objects.get(user=user)
                 except BrandUser.DoesNotExist:
                     # Create a new brand user profile
-                    brand_user = BrandUser.objects.create(user=user)
+                    brand_user = BrandUser.objects.create(user=user, onboarding_status=1)  # Phone verified, move to email
                     is_new_user = True
+
+                # Update onboarding status if phone is verified and user is at phone verification step
+                if user.is_phone_verified and brand_user.onboarding_status == 0:
+                    brand_user.update_onboarding_status(1)  # Move to email verification
 
                 return Response({
                     'success': True,
@@ -349,8 +353,12 @@ class VerifyEmailOTPAPIView(APIView):
                     brand_user = BrandUser.objects.get(user=user)
                 except BrandUser.DoesNotExist:
                     # Create a new brand user profile
-                    brand_user = BrandUser.objects.create(user=user)
+                    brand_user = BrandUser.objects.create(user=user, onboarding_status=2)  # Email verified, move to GST
                     is_new_user = True
+
+                # Update onboarding status if email is verified and user is at email verification step
+                if user.is_email_verified and brand_user.onboarding_status == 1:
+                    brand_user.update_onboarding_status(2)  # Move to GST verification
 
                 return Response({
                     'success': True,
