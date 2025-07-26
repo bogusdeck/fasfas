@@ -11,7 +11,8 @@ from .serializers import (
     SignatureUploadSerializer, SaveSignatureAndTANSerializer,
     FinalSubmissionSerializer, BusinessPreferenceSerializer,
     BankDetailsSerializer, MicroDepositVerificationSerializer,
-    BrandProductDetailsSerializer, WarehouseDetailsSerializer
+    BrandProductDetailsSerializer, WarehouseDetailsSerializer,
+    BrandProfileStatusSerializer
 )
 from .models import BrandUser
 from brand.helpers import check_user_verification, get_brand_user
@@ -758,7 +759,6 @@ class MicroDepositVerificationAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class BrandOnboardingSummaryAPIView(APIView):
     """
     API endpoint for retrieving the complete brand onboarding summary
@@ -991,26 +991,29 @@ class FinalSubmissionAPIView(APIView):
         serializer = FinalSubmissionSerializer(data=request.data)
         if serializer.is_valid():
             # Check if all required onboarding steps are completed
-            # We can use the onboarding_status to check this
             if brand_user.onboarding_status < 9:  # 9 means bank details are completed
+                # Use the status map directly from the model to determine incomplete steps
+                # First get the current status details to access the status_map structure
+                status_details = brand_user.get_onboarding_status_details()
+
                 # Determine which steps are incomplete
                 incomplete_steps = []
-                onboarding_status = brand_user.onboarding_status
 
-                if onboarding_status < 3:
-                    incomplete_steps.append('GST Verification')
-                if onboarding_status < 4:
-                    incomplete_steps.append('Brand Basic Information')
-                if onboarding_status < 5:
-                    incomplete_steps.append('Signature and TAN')
-                if onboarding_status < 6:
-                    incomplete_steps.append('Business Preference')
-                if onboarding_status < 7:
-                    incomplete_steps.append('Warehouse Details')
-                if onboarding_status < 8:
-                    incomplete_steps.append('Product Details')
-                if onboarding_status < 9:
-                    incomplete_steps.append('Bank Details')
+                # These are the status levels we need to check (GST verification to Bank details)
+                required_steps = [
+                    {'level': 2, 'name': 'GST Verification'},
+                    {'level': 3, 'name': 'Brand Basic Information'},
+                    {'level': 4, 'name': 'Signature and TAN'},
+                    {'level': 5, 'name': 'Business Preference'},
+                    {'level': 6, 'name': 'Warehouse Details'},
+                    {'level': 7, 'name': 'Product Details'},
+                    {'level': 8, 'name': 'Bank Details'}
+                ]
+
+                # Check each step that should be completed
+                for step in required_steps:
+                    if brand_user.onboarding_status < step['level']:
+                        incomplete_steps.append(step['name'])
 
                 return Response(
                     {
@@ -1055,3 +1058,79 @@ class FinalSubmissionAPIView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BrandProfileStatusAPIView(APIView):
+    """
+    API endpoint to get brand profile and onboarding status
+
+    Returns the current onboarding status of the brand user with appropriate status codes
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get Brand Profile Status",
+        operation_description="Get brand profile and onboarding status with status codes",
+        responses={
+            200: openapi.Response(
+                description="Profile status retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'profile': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'status_code': openapi.Schema(type=openapi.TYPE_STRING),
+                                'status_message': openapi.Schema(type=openapi.TYPE_STRING),
+                                'current_step': openapi.Schema(type=openapi.TYPE_STRING),
+                                'is_onboarding_complete': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            }
+                        )
+                    }
+                )
+            ),
+            404: openapi.Response(description="Brand profile not found"),
+        }
+    )
+    def get(self, request):
+        try:
+            # Get or create brand user profile
+            brand_user, created = BrandUser.objects.get_or_create(
+                user=request.user,
+                defaults={
+                    'onboarding_status': 0  # Start with phone verification
+                }
+            )
+
+            # Serialize the brand user data
+            serializer = BrandProfileStatusSerializer(brand_user)
+            profile_data = serializer.data
+
+            # Get onboarding status details
+            status_details = brand_user.get_onboarding_status_details()
+
+            return Response({
+                'success': True,
+                'message': 'Profile status retrieved successfully',
+                'data': {
+                    'profile': profile_data,
+                    'status_code': status_details['code'],
+                    'status_message': status_details['message'],
+                    'current_step': status_details['step'],
+                    'is_onboarding_complete': brand_user.onboarding_status == 10,
+                    'onboarding_progress': {
+                        'current_step': brand_user.onboarding_status,
+                        'total_steps': 10,
+                        'percentage': (brand_user.onboarding_status / 10) * 100
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error retrieving profile status: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -3,14 +3,13 @@ from .views import (RequestPhoneOTPAPIView, VerifyPhoneOTPAPIView,
                    RequestEmailOTPAPIView, VerifyEmailOTPAPIView,
                    BrandDashboardAPIView, BrandProfileUpdateAPIView)
 from .auth_views import EmailPasswordSignupAPIView, EmailPasswordLoginAPIView
-from .profile_views import BrandProfileStatusAPIView
 from .onboarding import (
     GSTVerificationAPIView, BrandBasicInfoAPIView,
     SignatureUploadAPIView, SaveSignatureAndTANAPIView,
     BusinessPreferenceAPIView, WarehouseDetailsAPIView,
     BrandProductDetailsAPIView, BankDetailsAPIView,
     MicroDepositVerificationAPIView, BrandOnboardingSummaryAPIView,
-    FinalSubmissionAPIView
+    FinalSubmissionAPIView, BrandProfileStatusAPIView
 )
 from .dashboard import BrandProfileAPIView, BrandAnnouncementsAPIView, BrandPendingTasksAPIView
 
