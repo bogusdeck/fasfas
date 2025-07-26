@@ -21,17 +21,17 @@ services:
       - PYTHONUNBUFFERED=1
       - DJANGO_SETTINGS_MODULE=systum.settings.development
 
-  # Frontend container (React)
-  frontend:
-    build:
-      context: ./FASFAS
-      dockerfile: Dockerfile
-    volumes:
-      - ./FASFAS:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
-    depends_on:
-      - backend
+  # # Frontend container (React)
+  # frontend:
+  #   build:
+  #     context: ./twek
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./twek:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NODE_ENV=development
+  #   depends_on:
+  #     - backend
