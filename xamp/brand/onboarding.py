@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import uuid
+import os
 
 from .serializers import (
     GSTVerificationSerializer, BrandBasicInfoSerializer,
@@ -642,8 +643,7 @@ class BankDetailsAPIView(APIView):
             bank_reference_id = f"BANK-REF-{uuid.uuid4().hex[:8].upper()}"
             brand_details.bank_reference_id = bank_reference_id
 
-            import random
-            micro_deposit_amount = random.randint(1, 99) / 100
+            micro_deposit_amount = 1.00
             brand_details.micro_deposit_amount = micro_deposit_amount
             brand_details.save()
 
@@ -824,7 +824,7 @@ class BrandOnboardingSummaryAPIView(APIView):
         try:
             brand_details = BrandDetails.objects.get(brand_user=brand_user)
             brand_details_data = {
-                'company_name': brand_details.company_name or '',
+                'company_name': brand_details.brand_user.company_name or '',
                 'company_type': brand_details.company_type or '',
                 'address': brand_details.address or '',
                 'gst_number': brand_details.gst_number or '',

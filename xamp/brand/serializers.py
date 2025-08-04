@@ -59,7 +59,6 @@ class EmailPasswordLoginSerializer(serializers.Serializer):
 
 class GSTVerificationSerializer(serializers.Serializer):
     gst_number = serializers.CharField(required=True)
-    company_name = serializers.CharField(required=False)
 
 
 class BrandBasicInfoSerializer(serializers.Serializer):
