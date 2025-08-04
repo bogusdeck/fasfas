@@ -870,11 +870,6 @@ class BrandOnboardingSummaryAPIView(APIView):
                 city_warehouses.append({
                     'city_name': state.name,
                     'warehouse_count': warehouses.count(),
-                    'warehouses': [{
-                        'code': w.code,
-                        'type': w.type,
-                        'address': w.address
-                    } for w in warehouses]
                 })
         except Brand.DoesNotExist:
             brand_data = {}
@@ -891,15 +886,15 @@ class BrandOnboardingSummaryAPIView(APIView):
             'gst_info': {
                 'gst_number': brand_details_data.get('gst_number', ''),
                 'company_name': brand_details_data.get('company_name', ''),
-                'verification_status': 'Verified' if brand_user.gst_verified else 'Not Verified',
+                'verification_status': brand_details_data.get('is_gst_verified', False),
             },
             'signature_info': {
                 'signature_id': brand_details_data.get('signature_id', ''),
                 'tan_number': brand_details_data.get('tan_number', ''),
             },
             'business_preference': {
-                'preference': brand_user.business_preference or '',
-                'description': dict(brand_user.BUSINESS_PREFERENCE_CHOICES).get(brand_user.business_preference, '') if brand_user.business_preference else '',
+                'preference': brand_details_data.get('business_preference', ''),
+                'description': dict(BrandDetails.BUSINESS_PREFERENCE_CHOICES).get(brand_details_data.get('business_preference', ''), '') if brand_details_data.get('business_preference', '') else '',
             },
             'warehouse_details': {
                 'city_warehouses': city_warehouses,
@@ -920,12 +915,12 @@ class BrandOnboardingSummaryAPIView(APIView):
                 'ifsc_code': brand_details_data.get('ifsc_code', ''),
                 'cancelled_cheque_uploaded': bool(brand_details_data.get('cancelled_cheque_path', '')),
                 'bank_reference_id': brand_details_data.get('bank_reference_id', ''),
-                'bank_verification_status': 'Verified' if brand_details_data.get('is_bank_verified', False) else 'Not Verified',
+                'bank_verification_status': brand_details_data.get('is_bank_verified', False),
             },
             'verification_status': {
                 'email_verified': user.is_email_verified,
                 'phone_verified': user.is_phone_verified,
-                'gst_verified': brand_user.gst_verified,
+                'gst_verified': brand_details_data.get('is_gst_verified', False),
                 'bank_verified': brand_details_data.get('is_bank_verified', False),
                 'onboarding_complete': brand_details_data.get('onboarding_completed', False),
                 'onboarding_id': brand_details_data.get('onboarding_id', ''),

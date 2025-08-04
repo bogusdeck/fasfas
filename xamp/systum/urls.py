@@ -22,19 +22,26 @@ from django.views.generic import RedirectView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from django.urls import include
 
-# Swagger/OpenAPI schema configuration
+# Create brand-only URL patterns for Swagger
+brand_patterns = [
+    path('api/brand/', include('brand.urls')),
+]
+
+# Swagger/OpenAPI schema configuration - Brand endpoints only
 schema_view = get_schema_view(
     openapi.Info(
-        title="Xamp API",
+        title="Xamp Brand API",
         default_version='v1',
-        description="API documentation for Xamp project",
+        description="API documentation for Xamp Brand endpoints only",
         terms_of_service="https://www.example.com/terms/",
         contact=openapi.Contact(email="contact@example.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    patterns=brand_patterns,  # Only include brand patterns
 )
 
 urlpatterns = [
