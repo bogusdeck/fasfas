@@ -85,6 +85,7 @@ class BrandDetails(models.Model):
     contact_number = models.CharField(max_length=20)
     company_type = models.CharField(max_length=100)
     address = models.TextField()
+    gst_number = models.CharField(max_length=15, blank=True, null=True, help_text="GST Number")
     business_preference = models.CharField(max_length=50, choices=BUSINESS_PREFERENCE_CHOICES, blank=True, null=True, help_text="Business preference for selling")
     daily_order_volume = models.PositiveIntegerField(blank=True, null=True, help_text="Expected daily order volume as integer")
     signature_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the verified signature")
