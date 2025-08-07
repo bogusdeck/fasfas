@@ -394,7 +394,7 @@ class Product(models.Model):
     dimensions = models.CharField(max_length=100, blank=True, null=True, help_text="L x W x H in cm")
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=PRODUCT_STATUS, default='active')
-    warehouses = models.ManyToManyField(Warehouse, through='ProductWarehouse', related_name='products')
+    warehouses = models.ManyToManyField(BrandWarehouse, through='ProductWarehouse', related_name='products')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -425,7 +425,7 @@ class ProductWarehouse(models.Model):
     Intermediate model to store product quantities in specific warehouses
     """
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE)
+    warehouse = models.ForeignKey(BrandWarehouse, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=0)
     minimum_stock_level = models.PositiveIntegerField(default=10, help_text="Minimum stock level for reorder")
     maximum_stock_level = models.PositiveIntegerField(blank=True, null=True, help_text="Maximum stock level")
