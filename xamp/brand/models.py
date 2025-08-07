@@ -272,73 +272,104 @@ class Brand(models.Model):
     def total_products(self):
         return Product.objects.filter(warehouses__state__brand=self).distinct().count()
 
-
 class State(models.Model):
     """
-    Model to represent states/cities where brand operates
+    Containing all states our product is operating
     """
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='states')
-    name = models.CharField(max_length=100)
+    state_name = models.CharField(max_length=100)
     state_code = models.CharField(max_length=10, blank=True, null=True)
     country = models.CharField(max_length=100, default='India')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     class Meta:
-        ordering = ['name']
-        unique_together = ['brand', 'name']  # Same brand can't have duplicate state names
-
+        ordering = ['state_name']
+    
     def __str__(self):
-        return f"{self.name} - {self.brand.name}"
-
-    @property
-    def total_warehouses(self):
-        return self.warehouses.count()
-
-    @property
-    def total_products(self):
-        return Product.objects.filter(warehouses__state=self).distinct().count()
+        return self.state_name
 
 
-class Warehouse(models.Model):
-    """
-    Model to represent warehouses in different states
-    """
-    WAREHOUSE_TYPES = (
-        ('main', 'Main Warehouse'),
-        ('distribution', 'Distribution Center'),
-        ('retail', 'Retail Store'),
-        ('fulfillment', 'Fulfillment Center'),
-    )
-
-    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='warehouses')
-    name = models.CharField(max_length=255)
-    warehouse_code = models.CharField(max_length=50, unique=True)
-    warehouse_type = models.CharField(max_length=20, choices=WAREHOUSE_TYPES, default='main')
-    address = models.TextField()
-    contact_person = models.CharField(max_length=255, blank=True, null=True)
-    contact_phone = models.CharField(max_length=20, blank=True, null=True)
-    contact_email = models.EmailField(blank=True, null=True)
-    capacity = models.PositiveIntegerField(help_text="Storage capacity in square feet", blank=True, null=True)
-    is_active = models.BooleanField(default=True)
+class BrandWarehouse(models.Model):
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='brand_warehouses')
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='brand_warehouses')
+    count_of_warehouse = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     class Meta:
-        ordering = ['name']
-        unique_together = ['state', 'name']  # Same state can't have duplicate warehouse names
-
+        unique_together = ['brand', 'state']
+    
     def __str__(self):
-        return f"{self.name} ({self.warehouse_code}) - {self.state.name}"
+        return f"{self.brand.name} - {self.state.state_name} ({self.count_of_warehouse} warehouses)"
 
-    @property
-    def total_products(self):
-        return self.products.count()
 
-    @property
-    def brand(self):
-        return self.state.brand
+# class State(models.Model):
+#     """
+#     Model to represent states/cities where brand operates
+#     """
+#     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='states')
+#     name = models.CharField(max_length=100)
+#     state_code = models.CharField(max_length=10, blank=True, null=True)
+#     country = models.CharField(max_length=100, default='India')
+#     is_active = models.BooleanField(default=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         ordering = ['name']
+#         unique_together = ['brand', 'name']  # Same brand can't have duplicate state names
+
+#     def __str__(self):
+#         return f"{self.name} - {self.brand.name}"
+
+#     @property
+#     def total_warehouses(self):
+#         return self.warehouses.count()
+
+#     @property
+#     def total_products(self):
+#         return Product.objects.filter(warehouses__state=self).distinct().count()
+
+
+# class Warehouse(models.Model):
+#     """
+#     Model to represent warehouses in different states
+#     """
+#     WAREHOUSE_TYPES = (
+#         ('main', 'Main Warehouse'),
+#         ('distribution', 'Distribution Center'),
+#         ('retail', 'Retail Store'),
+#         ('fulfillment', 'Fulfillment Center'),
+#     )
+
+#     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='warehouses')
+#     name = models.CharField(max_length=255)
+#     warehouse_code = models.CharField(max_length=50, unique=True)
+#     warehouse_type = models.CharField(max_length=20, choices=WAREHOUSE_TYPES, default='main')
+#     address = models.TextField()
+#     contact_person = models.CharField(max_length=255, blank=True, null=True)
+#     contact_phone = models.CharField(max_length=20, blank=True, null=True)
+#     contact_email = models.EmailField(blank=True, null=True)
+#     capacity = models.PositiveIntegerField(help_text="Storage capacity in square feet", blank=True, null=True)
+#     is_active = models.BooleanField(default=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         ordering = ['name']
+#         unique_together = ['state', 'name']  # Same state can't have duplicate warehouse names
+
+#     def __str__(self):
+#         return f"{self.name} ({self.warehouse_code}) - {self.state.name}"
+
+#     @property
+#     def total_products(self):
+#         return self.products.count()
+
+#     @property
+#     def brand(self):
+#         return self.state.brand
 
 
 class Product(models.Model):

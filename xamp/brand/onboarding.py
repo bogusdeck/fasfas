@@ -417,63 +417,67 @@ class WarehouseDetailsAPIView(APIView):
         serializer = WarehouseDetailsSerializer(data=request.data)
         if serializer.is_valid():
             # Import required models
-            from .models import BrandDetails, Brand, State, Warehouse
+            from .models import BrandDetails, Brand, State, BrandWarehouse
+            from django.core.exceptions import ObjectDoesNotExist
 
-            # Get or create BrandDetails and save daily order volume
-            brand_details, created = BrandDetails.objects.get_or_create(
-                brand_user=brand_user,
-                defaults={
-                    'owner_name': '',
-                    'contact_number': '',
-                    'company_type': '',
-                    'address': '',
-                    'daily_order_volume': serializer.validated_data['daily_order_volume']
-                }
-            )
-
-            # If BrandDetails already exists, update the daily order volume
-            if not created:
+            try:
+                # Check if BrandDetails exists, if not throw error
+                brand_details = BrandDetails.objects.get(brand_user=brand_user)
+                # Update daily order volume
                 brand_details.daily_order_volume = serializer.validated_data['daily_order_volume']
                 brand_details.save()
+            except BrandDetails.DoesNotExist:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'User does not exist',
+                        'error_code': 'USER_NOT_FOUND'
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-            # Get or create Brand for this user
-            brand, brand_created = Brand.objects.get_or_create(
-                brand_user=brand_user,
-                defaults={
-                    'name': brand_user.company_name or f"Brand {brand_user.user.id}",
-                    'description': 'Brand created during onboarding'
-                }
-            )
+            try:
+                # Check if Brand exists, if not throw error
+                brand = Brand.objects.get(brand_user=brand_user)
+            except Brand.DoesNotExist:
+                return Response(
+                    {
+                        'success': False,
+                        'message': 'User does not exist',
+                        'error_code': 'USER_NOT_FOUND'
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-            # Process city_warehouses and create State and Warehouse records
+            # Process city_warehouses and create/update BrandWarehouse records
             for city_warehouse in serializer.validated_data['city_warehouses']:
                 city_name = city_warehouse['city_name']
                 warehouse_count = city_warehouse['warehouse_count']
 
-                # Get or create State
-                state, state_created = State.objects.get_or_create(
-                    brand=brand,
-                    name=city_name,
-                    defaults={
-                        'country': 'India',
-                        'is_active': True
-                    }
-                )
-
-                # Create warehouses for this state if they don't exist
-                existing_warehouses = state.warehouses.count()
-                warehouses_to_create = warehouse_count - existing_warehouses
-
-                for i in range(warehouses_to_create):
-                    warehouse_number = existing_warehouses + i + 1
-                    Warehouse.objects.create(
-                        state=state,
-                        name=f"{city_name} Warehouse {warehouse_number}",
-                        warehouse_code=f"{city_name.upper()[:3]}-WH-{warehouse_number:03d}",
-                        warehouse_type='main',
-                        address=f"Warehouse {warehouse_number}, {city_name}",
-                        is_active=True
+                # Get the state by name (assuming states are pre-created)
+                try:
+                    state = State.objects.get(state_name__iexact=city_name, is_active=True)
+                except State.DoesNotExist:
+                    return Response(
+                        {
+                            'success': False,
+                            'message': f'State "{city_name}" not found',
+                            'error_code': 'STATE_NOT_FOUND'
+                        },
+                        status=status.HTTP_404_NOT_FOUND
                     )
+
+                # Create or update BrandWarehouse record
+                brand_warehouse, created = BrandWarehouse.objects.get_or_create(
+                    brand=brand,
+                    state=state,
+                    defaults={'count_of_warehouse': warehouse_count}
+                )
+                
+                # If already exists, update the warehouse count
+                if not created:
+                    brand_warehouse.count_of_warehouse = warehouse_count
+                    brand_warehouse.save()
 
             # Update onboarding status to warehouse details completed
             brand_user.update_onboarding_status(7)
@@ -863,13 +867,12 @@ class BrandOnboardingSummaryAPIView(APIView):
             }
 
             # Get warehouse details
-            states = State.objects.filter(brand=brand)
+            brand_warehouses = BrandWarehouse.objects.filter(brand=brand)
             city_warehouses = []
-            for state in states:
-                warehouses = Warehouse.objects.filter(state=state)
+            for brand_warehouse in brand_warehouses:
                 city_warehouses.append({
-                    'city_name': state.name,
-                    'warehouse_count': warehouses.count(),
+                    'city_name': brand_warehouse.state.state_name,
+                    'warehouse_count': brand_warehouse.count_of_warehouse,
                 })
         except Brand.DoesNotExist:
             brand_data = {}
