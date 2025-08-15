@@ -11,7 +11,7 @@ import os
 from accounts.models import User, OTPVerification
 from brand.models import (
     BrandUser, BrandDetails, Announcement, BrandPendingTask,
-    Brand, State, Warehouse, Product, ProductWarehouse
+    Brand, State, BrandWarehouse, Product, ProductWarehouse
 )
 
 class Command(BaseCommand):
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         models_to_clear = [
             (ProductWarehouse, 'ProductWarehouse'),
             (Product, 'Product'),
-            (Warehouse, 'Warehouse'),
+            (BrandWarehouse, 'Warehouse'),
             (State, 'State'),
             (Brand, 'Brand'),
             (BrandPendingTask, 'BrandPendingTask'),

@@ -19,3 +19,13 @@ will do in future
 - logz.io type shit
 
 
+
+
+```bash
+export PROJECT_PATH="$HOME/xamp"
+export BACKEND_PATH="$PROJECT_PATH/xamp"
+alias dev="cd $PROJECT_PATH; source .venv/bin/activate; cd xamp"
+alias manage="dev; python manage.py"
+alias run="manage runserver"
+alias shell="manage shell_plus --quiet-load"
+```
