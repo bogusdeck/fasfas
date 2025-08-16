@@ -815,7 +815,7 @@ class BrandOnboardingSummaryAPIView(APIView):
             return error_response
 
         # Fetch actual data from the database
-        from brand.models import BrandDetails, Brand, State, Warehouse
+        from brand.models import BrandDetails, Brand, State, BrandWarehouse
 
         # Get user details
         user_details = {
