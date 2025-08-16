@@ -6,8 +6,8 @@ export default function OnboardingSidebar({ currentStep = 1 }) {
     { number: 2, title: 'Basic Information', icon: '📋' },
     { number: 3, title: 'Signature Upload', icon: '✍️' },
     { number: 4, title: 'Business Preferences', icon: '⚙️' },
-    { number: 5, title: 'Warehouse Details', icon: '🏪' },
-    { number: 6, title: 'Brand Details', icon: '🛍️' },
+    { number: 5, title: 'Brand Details', icon: '🛍️' },
+    { number: 6, title: 'Warehouse Details', icon: '🏪' },
     { number: 7, title: 'Bank Details', icon: '🏦' },
     { number: 8, title: 'Declaration', icon: '✅' },
   ];

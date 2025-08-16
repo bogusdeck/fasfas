@@ -321,7 +321,7 @@ export default function RegistrationForm() {
           );
         case 5:
           return (
-            <WarehouseDetailsStep
+            <BrandProductDetailsStep
               formData={formData}
               handleChange={handleChange}
               onSubmit={handleSubmit}
@@ -330,7 +330,7 @@ export default function RegistrationForm() {
           );
         case 6:
           return (
-            <BrandProductDetailsStep
+            <WarehouseDetailsStep
               formData={formData}
               handleChange={handleChange}
               onSubmit={handleSubmit}
@@ -451,7 +451,7 @@ export default function RegistrationForm() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#241331]/5 via-white to-[#C3AF6C]/5 flex">
       {/* Temporary Auth Diagnostic Tool */}
-      <AuthDiagnostic />
+      {/* <AuthDiagnostic /> */}
       
       {/* Sidebar - show during onboarding */}
       {isOnboarding && <OnboardingSidebar currentStep={currentStep} />}

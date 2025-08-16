@@ -513,16 +513,16 @@ export const ONBOARDING_STEPS = {
     },
   },
   5: {
-    title: 'Warehouse Details',
-    subtitle: 'Provide your warehouse and order information',
+    title: 'Brand and Product Details',
+    subtitle: 'Upload your brand logo and define your product catalog',
     buttons: {
       back: 'Back',
       submit: 'Continue',
     },
   },
   6: {
-    title: 'Brand and Product Details',
-    subtitle: 'Upload your brand logo and define your product catalog',
+    title: 'Warehouse Details',
+    subtitle: 'Provide your warehouse and order information',
     buttons: {
       back: 'Back',
       submit: 'Continue',
