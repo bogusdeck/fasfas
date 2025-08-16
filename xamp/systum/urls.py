@@ -47,7 +47,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     # Redirect root URL to Swagger documentation
     path('', RedirectView.as_view(url='/swagger/', permanent=False), name='index'),
-    
+
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/brand/', include('brand.urls')),

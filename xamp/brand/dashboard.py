@@ -314,3 +314,4 @@ class BrandPendingTasksAPIView(APIView, OnboardingRequiredMixin):
             },
             status=status.HTTP_200_OK
         )
+
